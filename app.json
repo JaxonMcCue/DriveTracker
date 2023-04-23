@@ -4,10 +4,10 @@
     "slug": "DriveTracker",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./images/Car.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./images/Car.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
