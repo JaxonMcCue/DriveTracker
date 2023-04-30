@@ -41,7 +41,7 @@ export function timeValidation(saveTime1, saveTime2) {
   return isValid;
 }
 
-//imperfect, strugle to figure out what to do if someone only did one number on left side of :
+//imperfect, struggle to figure out what to do if someone only did one number on left side of :
 export function timeDisplayMin(hour, min) {
   if (isUndefined(min) || Number(min) === 0) {
     return hour + ":00";

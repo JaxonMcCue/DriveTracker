@@ -174,12 +174,20 @@ function DataEntry({ navigation }) {
       var min1 = Number(time1.split(":")[1]);
       var min2 = Number(time2.split(":")[1]);
 
-      //add hours
+      //change to military time
       if (timeDay1 == "PM") {
-        hour1 += 12;
+        if (hour1 != 12) {
+          hour1 += 12;
+        }
+      } else if (hour1 == 12) {
+        hour1 = 0;
       }
       if (timeDay2 == "PM") {
-        hour2 += 12;
+        if (hour2 != 12) {
+          hour2 += 12;
+        }
+      } else if (hour2 == 12) {
+        hour2 = 0;
       }
 
       //improved minute display
@@ -291,6 +299,8 @@ function ProgressData() {
     let nightHours = 0;
 
     for (i = 0; i < times.length; i++) {
+      let tempDayHours = 0;
+      let tempNightHours = 0;
       var hours = times[i].hours;
       var hour1 =
         Number(times[i].time1.split(":")[0]) +
@@ -298,21 +308,54 @@ function ProgressData() {
       var hour2 =
         Number(times[i].time2.split(":")[0]) +
         Number(times[i].time2.split(":")[1]) / 60;
-      if (hour1 >= 6 && hour1 < 18) {
-        if (hour2 >= 6 && hour2 < 18) {
-          dayHours += hours;
+      if (hour1 < hour2) {
+        if (hour1 >= 6 && hour1 < 18) {
+          if (hour2 >= 6 && hour2 < 18) {
+            tempDayHours += hours;
+          } else {
+            tempDayHours += 18 - hour1;
+            tempNightHours += hours - tempDayHours;
+          }
         } else {
-          dayHours += 18 - hour1;
-          nightHours += hours - dayHours;
+          if (hour2 >= 6 && hour2 < 18) {
+            tempDayHours += hour2 - 6;
+            tempNightHours += hours - tempDayHours;
+          } else {
+            tempNightHours += hours;
+          }
         }
-      } else {
-        if (hour2 >= 6 && hour2 < 18) {
-          dayHours += hour2 - 6;
-          nightHours += hours - dayHours;
-        } else {
-          nightHours += hours;
+      } else { //start time is bigger than end time (day switch)
+        if (hour1 >= 6 && hour1 < 18) {
+          tempDayHours += 18 - hour1;
+          if(hour2 < 6) {
+            tempNightHours += 6 + hour2;
+          } else{
+            tempNightHours += 12;
+            tempDayHours += hour2;
+          }
+        }else{
+          if(hour1 < 6){ //starts early morning
+            tempNightHours += (6 - hour1) + 6; //time till day is considered + time till midnight
+            tempDayHours += 12;
+            tempNightHours += hour2;
+          }else{ //starts late night
+            if(hour2 >= 18){
+              tempNightHours += 12 - (hour1 - hour2);
+              tempDayHours += 12;
+            }else{
+              tempNightHours += 24 - hour1;
+              if(hour2 < 6){
+                tempNightHours += hour2;
+              }else{
+                tempNightHours += 6;
+                tempDayHours += hour2 - 6;
+              }
+            }
+          }
         }
       }
+      dayHours += tempDayHours;
+      nightHours += tempNightHours;
     }
     setCompleteDay(dayHours);
     setCompleteNight(nightHours);
@@ -344,7 +387,7 @@ function ProgressData() {
         height={300}
       />
       <Text style={styles.data}>
-        Hours completed: {hoursCompleted}/{Day + Night}
+        Hours completed: {hoursCompleted.toFixed(1)}/{Day + Night}
       </Text>
       <View>
         <Text>Day Hours:</Text>
@@ -533,5 +576,5 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     paddingLeft: 35,
     marginBottom: 45,
-  }
+  },
 });
