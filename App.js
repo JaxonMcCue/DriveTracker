@@ -21,12 +21,22 @@ import * as SplashScreen from "expo-splash-screen";
 import * as SQLite from "expo-sqlite";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import moment from "moment/moment";
+import { Border, VictoryPie } from "victory-native";
+import * as WebBrowser from "expo-web-browser";
+import { ProgressBar } from "react-native-paper";
+import { reloadAsync } from "expo-updates";
+import { isUndefined } from "lodash";
+
+import { timeValidation, timeDisplayMin } from "./Validate.js";
 
 const key = "@MyApp:key";
 
 const Stack = createNativeStackNavigator();
 SplashScreen.preventAutoHideAsync();
 setTimeout(SplashScreen.hideAsync, 2000);
+
+const Day = 40;
+const Night = 10;
 
 function openDatabase() {
   if (Platform.OS === "web") {
@@ -65,8 +75,8 @@ function Times() {
   return (
     <View>
       {times.map(({ id, time1, time2, hours }) => (
-        <Text key={id}>
-          Start: {time1}, End: {time2}, Hours: {hours}
+        <Text key={id} style={styles.hoursItems}>
+          Start: {time1}, End: {time2}, Hours: {hours.toFixed(1)}
         </Text>
       ))}
     </View>
@@ -150,68 +160,89 @@ function HomeScreen({ navigation }) {
 }
 
 function DataEntry({ navigation }) {
-  const [timeday1, setTimeDay1] = useState("AM");
-  const [timeday2, setTimeDay2] = useState("AM");
+  const [timeDay1, setTimeDay1] = useState("AM");
+  const [timeDay2, setTimeDay2] = useState("AM");
   const [time1, setTime1] = useState("");
   const [time2, setTime2] = useState("");
 
   saveData = async () => {
-    var hour1 = Number(time1.split(":")[0]);
-    if (timeday1 == "PM") {
-      hour1 += 12;
-    }
-    hour1 += Number(time1.split(":")[1]) / 60;
+    if (timeValidation(time1, time2)) {
+      var saveTime1 = time1;
+      var saveTime2 = time2;
+      var hour1 = Number(time1.split(":")[0]);
+      var hour2 = Number(time2.split(":")[0]);
+      var min1 = Number(time1.split(":")[1]);
+      var min2 = Number(time2.split(":")[1]);
 
-    var hour2 = Number(time2.split(":")[0]);
-    if (timeday2 == "PM") {
-      hour2 += 12;
-    }
-    hour2 += Number(time2.split(":")[1]) / 60;
+      //add hours
+      if (timeDay1 == "PM") {
+        hour1 += 12;
+      }
+      if (timeDay2 == "PM") {
+        hour2 += 12;
+      }
 
-    var totalHours;
-    if (hour2 > hour1) {
-      totalHours = hour2 - hour1;
+      //improved minute display
+      saveTime1 = timeDisplayMin(hour1, time1.split(":")[1]);
+      saveTime2 = timeDisplayMin(hour2, time2.split(":")[1]);
+
+      if (!isNaN(min1)) {
+        hour1 += min1 / 60;
+      }
+      if (!isNaN(min2)) {
+        hour2 += min2 / 60;
+      }
+
+      var totalHours = 0;
+      if (hour2 > hour1) {
+        totalHours = hour2 - hour1;
+      } else {
+        totalHours = 24 - hour1 + hour2;
+      }
+
+      db.transaction((tx) => {
+        tx.executeSql(
+          "insert into times (time1, time2, hours) values (?, ?, ?)",
+          [saveTime1, saveTime2, totalHours]
+        );
+      });
     }
-    db.transaction((tx) => {
-      tx.executeSql(
-        "insert into times (time1, time2, hours) values (?, ?, ?)",
-        [time1, time2, totalHours]
-      );
-    });
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.heading}>Start Time</Text>
-      <View style={styles.input}>
-        <TextInput
-          placeholder="XX:XX"
-          onChangeText={(time) => setTime1(time)}
-        />
-        <Picker
-          selectedValue={timeday1}
-          style={styles.picker}
-          onValueChange={(itemValue, itemIndex) => setTimeDay1(itemValue)}
-        >
-          <Picker.Item label="AM" value="AM" />
-          <Picker.Item label="PM" value="PM" />
-        </Picker>
-      </View>
-      <Text style={styles.heading}>End Time</Text>
-      <View style={styles.input}>
-        <TextInput
-          placeholder="XX:XX"
-          onChangeText={(time) => setTime2(time)}
-          style={styles.textInput}
-        />
-        <Picker
-          selectedValue={timeday2}
-          style={styles.picker}
-          onValueChange={(itemValue, itemIndex) => setTimeDay2(itemValue)}
-        >
-          <Picker.Item label="AM" value="AM" />
-          <Picker.Item label="PM" value="PM" />
-        </Picker>
+      <View style={styles.dataEnter}>
+        <Text style={styles.heading}>Start Time</Text>
+        <View style={styles.inputSpace}>
+          <TextInput
+            placeholder="XX:XX"
+            onChangeText={(time) => setTime1(time)}
+          />
+          <Picker
+            selectedValue={timeDay1}
+            style={styles.picker}
+            onValueChange={(itemValue, itemIndex) => setTimeDay1(itemValue)}
+          >
+            <Picker.Item label="AM" value="AM" />
+            <Picker.Item label="PM" value="PM" />
+          </Picker>
+        </View>
+        <Text style={styles.heading}>End Time</Text>
+        <View style={styles.input}>
+          <TextInput
+            placeholder="XX:XX"
+            onChangeText={(time) => setTime2(time)}
+            style={styles.textInput}
+          />
+          <Picker
+            selectedValue={timeDay2}
+            style={styles.picker}
+            onValueChange={(itemValue, itemIndex) => setTimeDay2(itemValue)}
+          >
+            <Picker.Item label="AM" value="AM" />
+            <Picker.Item label="PM" value="PM" />
+          </Picker>
+        </View>
       </View>
       <Pressable
         onPress={() => {
@@ -229,21 +260,132 @@ function DataDisplay() {
   const [forceUpdate, forceUpdateId] = useForceUpdate();
   return (
     <View style={styles.container}>
-      <ScrollView>
+      <ScrollView style={styles.hoursData}>
         <Times key={`forceupdate-done-${forceUpdateId}`} />
       </ScrollView>
     </View>
   );
 }
 
+function ProgressData() {
+  const [CompleteDay, setCompleteDay] = useState(0);
+  const [CompleteNight, setCompleteNight] = useState(0);
+  const [times, setTimes] = useState(null);
+
+  useEffect(() => {
+    db.transaction((tx) => {
+      tx.executeSql(
+        "select id, time1, time2, hours from times order by id desc;",
+        [],
+        (_, { rows: { _array } }) => setTimes(_array)
+      );
+    });
+
+    if (!(times === null || times.length === 0)) {
+      calculateCompleteHours();
+    }
+  });
+
+  let calculateCompleteHours = () => {
+    let dayHours = 0;
+    let nightHours = 0;
+
+    for (i = 0; i < times.length; i++) {
+      var hours = times[i].hours;
+      var hour1 =
+        Number(times[i].time1.split(":")[0]) +
+        Number(times[i].time1.split(":")[1]) / 60;
+      var hour2 =
+        Number(times[i].time2.split(":")[0]) +
+        Number(times[i].time2.split(":")[1]) / 60;
+      if (hour1 >= 6 && hour1 < 18) {
+        if (hour2 >= 6 && hour2 < 18) {
+          dayHours += hours;
+        } else {
+          dayHours += 18 - hour1;
+          nightHours += hours - dayHours;
+        }
+      } else {
+        if (hour2 >= 6 && hour2 < 18) {
+          dayHours += hour2 - 6;
+          nightHours += hours - dayHours;
+        } else {
+          nightHours += hours;
+        }
+      }
+    }
+    setCompleteDay(dayHours);
+    setCompleteNight(nightHours);
+  };
+
+  let hoursCompleted = 0;
+  if (CompleteDay > Day) {
+    hoursCompleted = Day;
+  } else {
+    hoursCompleted = CompleteDay;
+  }
+  if (CompleteNight > Night) {
+    hoursCompleted += Night;
+  } else {
+    hoursCompleted += CompleteNight;
+  }
+
+  return (
+    <View style={styles.data}>
+      <VictoryPie
+        data={[
+          { x: "Night", y: Night - CompleteNight },
+          { x: "Day", y: Day - CompleteDay },
+          { x: "Complete", y: CompleteDay + CompleteNight },
+        ]}
+        innerRadius={40}
+        style={styles.graph}
+        colorScale={["#5b2694", "#429ef5", "#29c429"]}
+        height={300}
+      />
+      <Text style={styles.data}>
+        Hours completed: {hoursCompleted}/{Day + Night}
+      </Text>
+      <View>
+        <Text>Day Hours:</Text>
+        <ProgressBar
+          style={{ height: 10, width: 200 }}
+          progress={CompleteDay / Day}
+          color="#49B5F2"
+        />
+        <View style={styles.inlineData}>
+          <Text style={styles.spaceItem}>{CompleteDay.toFixed(1)} Hours</Text>
+          <Text>{((CompleteDay / Day) * 100).toFixed(1)}%</Text>
+        </View>
+      </View>
+      <View>
+        <Text>Night Hours:</Text>
+        <ProgressBar
+          style={{ height: 10, width: 200 }}
+          progress={CompleteNight / Night}
+          color="#49B5F2"
+        />
+        <View style={styles.inlineData}>
+          <Text style={styles.spaceItem}>{CompleteNight.toFixed(1)} Hours</Text>
+          <Text>{((CompleteNight / Night) * 100).toFixed(1)}%</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 function ProgressDisplay({ navigation }) {
+  function link() {
+    WebBrowser.openBrowserAsync("https://www.drivinglaws.org/teen/nebteen.php");
+  }
   return (
     <View style={styles.container}>
-      <Pressable
-        onPress={() => navigation.navigate("Data")}
-        style={styles.button}
-      >
+      <ProgressData />
+      <Pressable onPress={() => navigation.navigate("Data")}>
         <Text style={styles.button}>Hours Data</Text>
+      </Pressable>
+      <Pressable onPress={() => link()}>
+        <Text>Reference</Text>
       </Pressable>
     </View>
   );
@@ -252,7 +394,7 @@ function ProgressDisplay({ navigation }) {
 export default function App() {
   useEffect(() => {
     db.transaction((tx) => {
-      //tx.executeSql("drop table times;");
+      // tx.executeSql("drop table times;");
       tx.executeSql(
         "create table if not exists times (id integer primary key not null, time1 string, time2 string, hours int);"
       );
@@ -262,10 +404,39 @@ export default function App() {
     <NavigationContainer>
       {
         <Stack.Navigator>
-          <Stack.Screen name="Home" component={HomeScreen} />
-          <Stack.Screen name="Data" component={DataDisplay} />
-          <Stack.Screen name="Enter" component={DataEntry} />
-          <Stack.Screen name="Progress" component={ProgressDisplay} />
+          <Stack.Screen
+            name="Home"
+            component={HomeScreen}
+            options={{
+              headerStyle: { backgroundColor: "#3d9be3" },
+              headerTintColor: "#fff",
+            }}
+          />
+          <Stack.Screen
+            name="Data"
+            component={DataDisplay}
+            options={{
+              title: "Hours Data",
+              headerStyle: { backgroundColor: "#3d9be3" },
+              headerTintColor: "#fff",
+            }}
+          />
+          <Stack.Screen
+            name="Enter"
+            component={DataEntry}
+            options={{
+              headerStyle: { backgroundColor: "#3d9be3" },
+              headerTintColor: "#fff",
+            }}
+          />
+          <Stack.Screen
+            name="Progress"
+            component={ProgressDisplay}
+            options={{
+              headerStyle: { backgroundColor: "#3d9be3" },
+              headerTintColor: "#fff",
+            }}
+          />
         </Stack.Navigator>
       }
     </NavigationContainer>
@@ -280,7 +451,7 @@ function useForceUpdate() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#e8f9fa",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -297,18 +468,70 @@ const styles = StyleSheet.create({
     margin: 5,
   },
   input: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    display: 'flex',
-    flexDirection: 'row',
+    alignItems: "center",
+    justifyContent: "center",
+    display: "flex",
+    flexDirection: "row",
     paddingLeft: 35,
-    marginBottom: 40,
   },
   picker: {
-    height: 50, 
+    height: 50,
     width: 105,
   },
   heading: {
     fontSize: 20,
+  },
+  graph: {
+    width: 200,
+    data: {
+      fillOpacity: 0.9,
+      stroke: "#fff",
+      strokeWidth: 2,
+    },
+    labels: {
+      fill: "#212121",
+    },
+  },
+  data: {
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  inlineData: {
+    flexDirection: "row",
+    marginBottom: 20,
+  },
+  spaceItem: {
+    flex: 1,
+  },
+  headerStyle: {
+    backgroundColor: "#3d9be3",
+    headerTintColor: "#fff",
+    alignItems: "center",
+  },
+  hoursData: {
+    margin: 20,
+  },
+  hoursItems: {
+    margin: 5,
+    borderBottomWidth: 1,
+    borderColor: "#c2c2c2",
+  },
+  dataEnter: {
+    backgroundColor: "#e8f9fa",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#c2c2c2",
+    padding: 20,
+    margin: 50,
+  },
+  inputSpace: {
+    alignItems: "center",
+    justifyContent: "center",
+    display: "flex",
+    flexDirection: "row",
+    paddingLeft: 35,
+    marginBottom: 45,
   }
 });
