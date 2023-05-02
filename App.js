@@ -324,7 +324,7 @@ function ProgressData() {
             tempNightHours += hours;
           }
         }
-      } else { //start time is bigger than end time (day switch)
+      } else if (!(hour1 == hour2)) { //start time is bigger than end time (day switch)
         if (hour1 >= 6 && hour1 < 18) {
           tempDayHours += 18 - hour1;
           if(hour2 < 6) {
@@ -353,6 +353,9 @@ function ProgressData() {
             }
           }
         }
+      } else if (hours == 24){
+        dayHours += 12;
+        nightHours += 12;
       }
       dayHours += tempDayHours;
       nightHours += tempNightHours;
